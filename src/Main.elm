@@ -408,7 +408,7 @@ view model =
       pos = (toString shipX) ++ " " ++ (toString shipY)
       rotation = transform <| "rotate(" ++ angle ++ " " ++ pos ++ ")"
       ship = g [ rotation ] [ shipPolygon (shipX, shipY) fillColor ]
-  in Html.div []
+  in Html.div [ HtmlA.style [("height","100%")] ]
       [ case model.state of
            Ready -> welcomeMsg
            Over -> gameOverMsg model.score
