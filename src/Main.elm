@@ -17,7 +17,6 @@
 -}
 
 import Html exposing (Html)
-import Html.App as App
 import Html.Attributes as HtmlA
 import Svg.Lazy as SvgL
 import Svg exposing (..)
@@ -29,11 +28,18 @@ import Random
 import Char exposing (fromCode)
 import Set exposing (..)
 
+
+screenWidth : Int
 screenWidth = 800
+
+              
+screenHeight : Int              
 screenHeight = 600
 
+               
+main : Program Never Model Msg               
 main =
-    App.program
+    Html.program
         { init = init
         , view = view
         , update = update
@@ -184,8 +190,8 @@ control model =
                             37 -> {ship | angle = ship.angle - 0.08}
                             39 -> {ship | angle = ship.angle + 0.08}
                             _ -> ship
-        model' = { model | ship = Set.foldr (\k s -> move k s) model.ship model.keys }
-    in model' |> shoot |> accelerate
+        movedModel = { model | ship = Set.foldr (\k s -> move k s) model.ship model.keys }
+    in movedModel |> shoot |> accelerate
 
 
 accelerate : Model -> Model
@@ -225,18 +231,18 @@ hit a ast =
 detectCollisions : Model -> Model
 detectCollisions model =
     let kill a = {a | health = 0}
-        bulletCollision b a' = if hit b a' then {a' | health = a'.health - b.damage} else a'
+        bulletCollision b a = if hit b a then {a | health = a.health - b.damage} else a
         shipCollision a (s, asts) = if hit s a then (kill s, kill a :: asts) else (s, a :: asts)
         asteroids = List.map (\a -> List.foldr bulletCollision a model.bullets) model.asteroids       
-        (ship', asteroids') = List.foldr shipCollision (model.ship, []) asteroids
-        bullets' = List.filter (\b -> not (List.any (\a -> hit b a) asteroids')) model.bullets
+        (ship_, asteroids_) = List.foldr shipCollision (model.ship, []) asteroids
+        bullets_ = List.filter (\b -> not (List.any (\a -> hit b a) asteroids_)) model.bullets
     in if model.noCollision > model.time
        then model
        else { model |
-                  asteroids = asteroids',
-                  bullets = bullets',
-                  ship = ship',
-                  noCollision = if ship'.health <= 0 then model.time + 1000 else 0
+                  asteroids = asteroids_,
+                  bullets = bullets_,
+                  ship = ship_,
+                  noCollision = if ship_.health <= 0 then model.time + 1000 else 0
             }
 
 
@@ -262,17 +268,17 @@ updatePosition a =
 updateModel : Model -> (Model, Cmd Msg)
 updateModel model =
     let (alive, dead) = List.partition (\a -> a.health > 0) model.asteroids
-        dead' = List.filter (\a -> a.size == BigAsteroid) dead
+        fragmented = List.filter (\a -> a.size == BigAsteroid) dead
         s = model.ship
-        ship' = if s.health <= 0 then { s | health = 100, lives = s.lives - 1 } else s
+        ship_ = if s.health <= 0 then { s | health = 100, lives = s.lives - 1 } else s
         fragments ast = Random.generate NewAsteroids (asteroidListGen (Just ast.pos) 3 SmallAsteroid)
-        cmd = if not (List.isEmpty dead')
-              then Cmd.batch (List.map fragments dead')
+        cmd = if not (List.isEmpty fragmented)
+              then Cmd.batch (List.map fragments fragmented)
               else if List.isEmpty alive
                    then Random.generate NewAsteroids (asteroidListGen Nothing 5 BigAsteroid)
                    else Cmd.none
     in ({ model |
-             ship = ship',
+             ship = ship_,
              asteroids = alive,
              bullets = List.filter (\b -> b.lifeTime > model.time && b.health > 0) model.bullets,
              score = model.score + (List.length dead)
@@ -306,7 +312,7 @@ asteroidListGen : Maybe (Int, Int) -> Int -> AsteroidType -> Random.Generator (L
 asteroidListGen position n size =
     let asts = (Random.list n (asteroidGen size))
     in case position of
-           Just (x, y) -> Random.map (\a -> List.map (\a' -> {a' | pos = (x,y)}) a) asts
+           Just (x, y) -> Random.map (\a -> List.map (\a_ -> {a_ | pos = (x,y)}) a) asts
            Nothing -> asts    
 
 
@@ -352,6 +358,7 @@ shipPolygon (x, y) fillColor =
     in  polygon [ fill fillColor, points ps ] []
 
         
+statusStyle : Html.Attribute msg        
 statusStyle =
     HtmlA.style
         [ ("top", "0")
@@ -362,6 +369,7 @@ statusStyle =
         ]
 
         
+messageStyle : Html.Attribute msg        
 messageStyle =
     HtmlA.style
         [ ("top", "10%")
@@ -370,15 +378,17 @@ messageStyle =
         , ("color", "white")
         , ("fontSize", "5vh")
         ]
-        
 
+        
+welcomeMsg : Html msg
 welcomeMsg =
     Html.div [ messageStyle ]
         [ Html.text "Press any key to start"
         , Html.br [] []
         , Html.text "Use arrow keys to move and space to shoot" ]
-        
 
+        
+gameOverMsg : a -> Html msg
 gameOverMsg score =
     Html.div [ messageStyle ]
         [ Html.text "Game Over"
@@ -389,6 +399,7 @@ gameOverMsg score =
         ]
         
 
+statusText : a -> b -> Html msg        
 statusText score lives =
     Html.div [ statusStyle ]
         [ Html.text ("Score: " ++ toString score)
